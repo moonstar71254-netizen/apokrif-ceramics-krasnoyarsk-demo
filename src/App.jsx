@@ -2,596 +2,627 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import gsap from 'gsap';
 import { Observer } from 'gsap/Observer';
 import KilnStage from './scene/KilnStage';
-import GiftCertificateCard from './components/GiftCertificateCard';
-import { buildWaUrl, getSiteConfig } from './config';
+import { buildWhatsappLink, getSiteConfig } from './config';
 
 gsap.registerPlugin(Observer);
 gsap.ticker.lagSmoothing(0);
 
-const TOTAL_SCENES = 5;
-const UNLOCK_DELAY_MS = 480;
+const NAV_SCENES = [
+  { id: 0, label: 'Вход', num: '01' },
+  { id: 1, label: 'Мастерская', num: '02' },
+  { id: 2, label: 'Глазури', num: '03' },
+  { id: 3, label: 'Форматы', num: '04' },
+  { id: 4, label: 'Контакты', num: '05' },
+];
 
-function updateRadialGlow(e) {
-  const el = e.currentTarget;
-  const rect = el.getBoundingClientRect();
-  if (!rect.width || !rect.height) return;
-  const gx = Math.min(100, Math.max(0, ((e.clientX - rect.left) / rect.width) * 100));
-  const gy = Math.min(100, Math.max(0, ((e.clientY - rect.top) / rect.height) * 100));
-  el.style.setProperty('--gx', `${gx.toFixed(1)}%`);
-  el.style.setProperty('--gy', `${gy.toFixed(1)}%`);
+const GLAZE_UI = [
+  {
+    id: 'chamotte',
+    label: 'Тёмный шамот',
+    swatch: '#7B503A',
+    bgDeep: '#0A0908',
+    accent: '#C97A4B',
+    glowTint: 'rgba(201, 122, 75, 0.22)',
+  },
+  {
+    id: 'porcelain',
+    label: 'Молочный фарфор',
+    swatch: '#EFE6D9',
+    bgDeep: '#161412',
+    accent: '#E8DDD0',
+    glowTint: 'rgba(244, 237, 228, 0.20)',
+  },
+  {
+    id: 'copper',
+    label: 'Медная печь',
+    swatch: '#CC7139',
+    bgDeep: '#130B08',
+    accent: '#E08A48',
+    glowTint: 'rgba(224, 138, 72, 0.26)',
+  },
+];
+
+function getExitVector(el, fromIdx, toIdx, dir) {
+  const kind = el.dataset.anim || 'center';
+  const pair = `${Math.min(fromIdx, toIdx)}-${Math.max(fromIdx, toIdx)}`;
+
+  if (pair === '0-1') {
+    if (kind === 'left') return { x: -46, y: 0, scale: 0.96 };
+    if (kind === 'right') return { x: 46, y: 0, scale: 0.96 };
+    return { x: 0, y: dir * -22, scale: 0.97 };
+  }
+  if (pair === '1-2') {
+    return { x: dir * -54, y: 0, scale: 0.98 };
+  }
+  if (pair === '2-3') {
+    if (kind === 'top' || kind === 'left') return { x: -28, y: -22, scale: 0.98 };
+    if (kind === 'row' || kind === 'bottom') return { x: 28, y: 22, scale: 0.98 };
+    return { x: 0, y: dir * -26, scale: 0.97 };
+  }
+  if (pair === '3-4') {
+    return { x: 0, y: dir * -24, scale: 0.95 };
+  }
+  return { x: 0, y: dir * -26, scale: 0.97 };
 }
 
-function getTransitionProfile(fromIdx, toIdx, dir) {
-  const pair = Math.min(fromIdx, toIdx);
+function getEnterVector(el, fromIdx, toIdx, dir) {
+  const kind = el.dataset.anim || 'center';
+  const pair = `${Math.min(fromIdx, toIdx)}-${Math.max(fromIdx, toIdx)}`;
 
-  if (pair === 0) {
-    return {
-      out: { z: dir > 0 ? 180 : -160, scale: dir > 0 ? 1.08 : 0.92, rotateX: dir * 5, opacity: 0 },
-      inFrom: { z: dir > 0 ? -170 : 170, scale: dir > 0 ? 0.91 : 1.07, rotateX: dir * -5, opacity: 0 },
-      inTo: { z: 0, scale: 1, rotateX: 0, opacity: 1 },
-      counter: false,
-    };
+  if (pair === '0-1') {
+    if (kind === 'left') return { x: -46, y: 0, scale: 0.96 };
+    if (kind === 'right') return { x: 46, y: 0, scale: 0.96 };
+    return { x: 0, y: dir * 24, scale: 0.97 };
   }
-
-  if (pair === 1) {
-    return {
-      out: { x: dir * -110, z: -70, rotateY: dir * 16, opacity: 0 },
-      inFrom: { x: dir * 110, z: -70, rotateY: dir * -16, opacity: 0 },
-      inTo: { x: 0, z: 0, rotateY: 0, opacity: 1 },
-      counter: false,
-    };
+  if (pair === '1-2') {
+    return { x: dir * 54, y: 0, scale: 0.98 };
   }
-
-  if (pair === 2) {
-    return {
-      out: { x: dir * -45, z: -60, opacity: 0 },
-      inFrom: { x: 0, z: 0, opacity: 0 },
-      inTo: { x: 0, z: 0, opacity: 1 },
-      counter: true,
-    };
+  if (pair === '2-3') {
+    if (kind === 'top' || kind === 'left') return { x: -30, y: -24, scale: 0.98 };
+    if (kind === 'row' || kind === 'bottom') return { x: 30, y: 24, scale: 0.98 };
+    return { x: 0, y: dir * 24, scale: 0.98 };
   }
-
-  return {
-    out: { z: dir > 0 ? -170 : 140, rotateX: dir * -8, scale: dir > 0 ? 0.92 : 1.06, opacity: 0 },
-    inFrom: { z: dir > 0 ? 150 : -160, rotateX: dir * 8, scale: dir > 0 ? 1.06 : 0.92, opacity: 0 },
-    inTo: { z: 0, rotateX: 0, scale: 1, opacity: 1 },
-    counter: false,
-  };
+  if (pair === '3-4') {
+    return { x: 0, y: dir * 26, scale: 0.95 };
+  }
+  return { x: 0, y: dir * 26, scale: 0.97 };
 }
 
 export default function App() {
-  const cfg = useMemo(() => getSiteConfig(), []);
-  const navItems = cfg.navigation || [];
-  const formatItems = (cfg.formats && cfg.formats.items) || [];
-
+  const config = useMemo(() => getSiteConfig(), []);
   const [activeScene, setActiveScene] = useState(0);
-  const [selectedServiceIdx, setSelectedServiceIdx] = useState(0);
+  const [glazeKey, setGlazeKey] = useState('chamotte');
+  const [selectedFormatIdx, setSelectedFormatIdx] = useState(0);
+  const [isDraggingGlaze, setIsDraggingGlaze] = useState(false);
 
   const activeSceneRef = useRef(0);
-  const isTransitioningRef = useRef(false);
-  const unlockTimerRef = useRef(null);
-  const activeTimelineRef = useRef(null);
-  const sceneRefs = useRef([]);
+  const lastNavTimeRef = useRef(0);
+  const sectionRefs = useRef([]);
+  const transitionTlRef = useRef(null);
+
+  // Shared refs for WebGL (cursor parallax & Scene 2 drag-to-rotate)
   const pointerRef = useRef({ x: 0, y: 0 });
+  const dragStateRef = useRef({ isDragging: false, velocity: 0 });
+  const dragTrackRef = useRef({ active: false, pointerId: null, lastX: 0, startX: 0, startY: 0, lockedAxis: null });
 
-  const goToScene = useCallback((targetIdx, immediate = false) => {
-    const nextIdx = Math.max(0, Math.min(TOTAL_SCENES - 1, targetIdx));
-    const prevIdx = activeSceneRef.current;
+  const activeFormat = config.formats[selectedFormatIdx] || config.formats[0];
+  const focusTarget = activeFormat?.focus || (selectedFormatIdx >= 3 ? 'piala' : 'amphora');
 
-    if (nextIdx === prevIdx) return;
-    if (!immediate && isTransitioningRef.current) return;
-
-    if (unlockTimerRef.current) {
-      clearTimeout(unlockTimerRef.current);
-      unlockTimerRef.current = null;
-    }
-
-    if (activeTimelineRef.current) {
-      activeTimelineRef.current.kill();
-      activeTimelineRef.current = null;
-    }
-
-    isTransitioningRef.current = true;
-    const dir = nextIdx > prevIdx ? 1 : -1;
-    const prevEl = sceneRefs.current[prevIdx];
-    const nextEl = sceneRefs.current[nextIdx];
-
-    activeSceneRef.current = nextIdx;
-    setActiveScene(nextIdx);
-
-    const profile = getTransitionProfile(prevIdx, nextIdx, dir);
-
-    sceneRefs.current.forEach((el, idx) => {
-      if (!el || idx === prevIdx || idx === nextIdx) return;
-      gsap.set(el, { autoAlpha: 0, pointerEvents: 'none', clearProps: 'transform' });
-    });
-
-    const tl = gsap.timeline({
-      onComplete: () => {
-        if (prevEl) {
-          gsap.set(prevEl, { autoAlpha: 0, pointerEvents: 'none', clearProps: 'transform' });
-        }
-        if (nextEl) {
-          gsap.set(nextEl, { clearProps: 'transform' });
-          const counters = nextEl.querySelectorAll('[data-counter]');
-          if (counters.length) {
-            gsap.set(counters, { clearProps: 'transform,opacity' });
-          }
-        }
-      },
-    });
-    activeTimelineRef.current = tl;
-
-    if (prevEl) {
-      gsap.set(prevEl, { pointerEvents: 'none' });
-      tl.to(
-        prevEl,
-        {
-          ...profile.out,
-          autoAlpha: 0,
-          duration: 0.24,
-          ease: 'power2.in',
-        },
-        0
-      );
-    }
-
-    if (nextEl) {
-      gsap.set(nextEl, {
-        ...profile.inFrom,
-        autoAlpha: 0,
-        pointerEvents: 'auto',
-      });
-
-      tl.to(
-        nextEl,
-        {
-          ...profile.inTo,
-          autoAlpha: 1,
-          duration: 0.48,
-          ease: 'expo.out',
-        },
-        0.22
-      );
-
-      if (profile.counter) {
-        const groupA = nextEl.querySelectorAll('[data-counter="a"]');
-        const groupB = nextEl.querySelectorAll('[data-counter="b"]');
-        if (groupA.length) {
-          tl.fromTo(
-            groupA,
-            { x: dir * -72, z: -50, rotateY: dir * 10, opacity: 0 },
-            { x: 0, z: 0, rotateY: 0, opacity: 1, duration: 0.48, ease: 'expo.out' },
-            0.22
-          );
-        }
-        if (groupB.length) {
-          tl.fromTo(
-            groupB,
-            { x: dir * 72, z: 45, rotateY: dir * -10, opacity: 0 },
-            { x: 0, z: 0, rotateY: 0, opacity: 1, duration: 0.48, ease: 'expo.out' },
-            0.22
-          );
-        }
-      }
-    }
-
-    unlockTimerRef.current = setTimeout(() => {
-      isTransitioningRef.current = false;
-      unlockTimerRef.current = null;
-    }, UNLOCK_DELAY_MS);
-  }, []);
-
+  // Initialize scene visibility cleanly on mount
   useEffect(() => {
-    sceneRefs.current.forEach((el, idx) => {
-      if (!el) return;
+    sectionRefs.current.forEach((sec, idx) => {
+      if (!sec) return;
+      gsap.set(sec, {
+        autoAlpha: idx === 0 ? 1 : 0,
+        pointerEvents: idx === 0 ? 'auto' : 'none',
+      });
+      const items = sec.querySelectorAll('[data-anim]');
       if (idx === 0) {
-        gsap.set(el, { autoAlpha: 1, pointerEvents: 'auto', clearProps: 'transform' });
+        gsap.fromTo(
+          items,
+          { autoAlpha: 0, y: 18, scale: 0.98 },
+          { autoAlpha: 1, y: 0, scale: 1, duration: 0.65, stagger: 0.06, ease: 'power3.out' }
+        );
       } else {
-        gsap.set(el, { autoAlpha: 0, pointerEvents: 'none', clearProps: 'transform' });
+        gsap.set(items, { autoAlpha: 0 });
       }
     });
   }, []);
 
+  // Animate CSS theme variables smoothly over 600ms on glaze change
+  useEffect(() => {
+    const theme = GLAZE_UI.find((g) => g.id === glazeKey) || GLAZE_UI[0];
+    const root = document.documentElement;
+    gsap.to(root, {
+      '--bg-deep': theme.bgDeep,
+      '--accent': theme.accent,
+      '--glow-tint': theme.glowTint,
+      duration: 0.6,
+      ease: 'power2.inOut',
+      overwrite: 'auto',
+    });
+  }, [glazeKey]);
+
+  // Subtle pointer parallax
+  useEffect(() => {
+    const onPointerMove = (e) => {
+      const nx = (e.clientX / window.innerWidth) * 2 - 1;
+      const ny = -((e.clientY / window.innerHeight) * 2 - 1);
+      pointerRef.current.x = nx;
+      pointerRef.current.y = ny;
+    };
+    window.addEventListener('pointermove', onPointerMove, { passive: true });
+    return () => window.removeEventListener('pointermove', onPointerMove);
+  }, []);
+
+  // Clean per-element scene transition (NO rotateX/rotateY on <section>)
+  const goToScene = useCallback((nextIdx) => {
+    const target = Math.max(0, Math.min(NAV_SCENES.length - 1, nextIdx));
+    const current = activeSceneRef.current;
+    if (target === current) return;
+
+    const now = performance.now();
+    if (now - lastNavTimeRef.current < 480) return;
+    lastNavTimeRef.current = now;
+
+    const dir = target > current ? 1 : -1;
+    activeSceneRef.current = target;
+    setActiveScene(target);
+
+    if (transitionTlRef.current) {
+      transitionTlRef.current.kill();
+    }
+
+    const outSec = sectionRefs.current[current];
+    const inSec = sectionRefs.current[target];
+
+    const tl = gsap.timeline();
+    transitionTlRef.current = tl;
+
+    if (outSec) {
+      const outItems = Array.from(outSec.querySelectorAll('[data-anim]'));
+      tl.set(outSec, { pointerEvents: 'none' }, 0);
+      outItems.forEach((el, i) => {
+        const v = getExitVector(el, current, target, dir);
+        tl.to(
+          el,
+          {
+            autoAlpha: 0,
+            x: v.x,
+            y: v.y,
+            scale: v.scale,
+            duration: 0.24,
+            ease: 'power2.in',
+          },
+          i * 0.015
+        );
+      });
+      tl.to(outSec, { autoAlpha: 0, duration: 0.24, ease: 'power2.in' }, 0);
+    }
+
+    if (inSec) {
+      const inItems = Array.from(inSec.querySelectorAll('[data-anim]'));
+      tl.set(inSec, { autoAlpha: 1, pointerEvents: 'auto' }, 0.24);
+      inItems.forEach((el, i) => {
+        const v = getEnterVector(el, current, target, dir);
+        tl.fromTo(
+          el,
+          { autoAlpha: 0, x: v.x, y: v.y, scale: v.scale },
+          {
+            autoAlpha: 1,
+            x: 0,
+            y: 0,
+            scale: 1,
+            duration: 0.48,
+            ease: 'power3.out',
+          },
+          0.24 + i * 0.05
+        );
+      });
+    }
+  }, []);
+
+  // GSAP Observer strictly 'wheel,touch' (NO 'pointer')
   useEffect(() => {
     const observer = Observer.create({
       type: 'wheel,touch',
       wheelSpeed: 1,
-      tolerance: 24,
+      tolerance: 18,
       preventDefault: true,
-      onDown: (self) => {
-        if (self.event && self.event.type && self.event.type.startsWith('touch')) {
-          goToScene(activeSceneRef.current - 1);
-        } else {
-          goToScene(activeSceneRef.current + 1);
-        }
+      onDown: () => {
+        if (dragStateRef.current.isDragging) return;
+        goToScene(activeSceneRef.current + 1);
       },
-      onUp: (self) => {
-        if (self.event && self.event.type && self.event.type.startsWith('touch')) {
-          goToScene(activeSceneRef.current + 1);
-        } else {
-          goToScene(activeSceneRef.current - 1);
-        }
+      onUp: () => {
+        if (dragStateRef.current.isDragging) return;
+        goToScene(activeSceneRef.current - 1);
       },
     });
 
-    const handleKeyDown = (e) => {
-      const tag = e.target && e.target.tagName ? e.target.tagName.toLowerCase() : '';
-      if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
-
-      if (e.key === 'PageDown' || (e.key === 'ArrowDown' && activeSceneRef.current !== 3)) {
+    const onKeyDown = (e) => {
+      if (e.key === 'ArrowDown' || e.key === 'PageDown') {
         e.preventDefault();
         goToScene(activeSceneRef.current + 1);
-      } else if (e.key === 'PageUp' || (e.key === 'ArrowUp' && activeSceneRef.current !== 3)) {
+      } else if (e.key === 'ArrowUp' || e.key === 'PageUp') {
         e.preventDefault();
         goToScene(activeSceneRef.current - 1);
       } else if (e.key === 'Home') {
         e.preventDefault();
-        goToScene(0, true);
+        goToScene(0);
       } else if (e.key === 'End') {
         e.preventDefault();
-        goToScene(TOTAL_SCENES - 1, true);
+        goToScene(NAV_SCENES.length - 1);
       }
     };
 
-    const handlePointerMove = (e) => {
-      if (e.pointerType === 'touch') return;
-      const nx = (e.clientX / window.innerWidth) * 2 - 1;
-      const ny = -(e.clientY / window.innerHeight) * 2 + 1;
-      pointerRef.current.x = Math.max(-1, Math.min(1, nx));
-      pointerRef.current.y = Math.max(-1, Math.min(1, ny));
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('pointermove', handlePointerMove, { passive: true });
-
+    window.addEventListener('keydown', onKeyDown);
     return () => {
       observer.kill();
-      window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('pointermove', handlePointerMove);
-      if (unlockTimerRef.current) clearTimeout(unlockTimerRef.current);
-      if (activeTimelineRef.current) activeTimelineRef.current.kill();
+      window.removeEventListener('keydown', onKeyDown);
     };
   }, [goToScene]);
 
-  const selectedService = formatItems[selectedServiceIdx] || formatItems[0] || {};
-  const waBase = (cfg.contacts && cfg.contacts.whatsappBase) || 'https://wa.me/79131080835';
-  const heroWaHref = buildWaUrl(waBase, cfg.contacts && cfg.contacts.whatsappDefaultMessage);
-  const selectedServiceWaHref = buildWaUrl(waBase, selectedService.waMessage);
-
-  const handleServiceKeyDown = (e, idx) => {
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      const next = (idx + 1) % formatItems.length;
-      setSelectedServiceIdx(next);
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      const prev = (idx - 1 + formatItems.length) % formatItems.length;
-      setSelectedServiceIdx(prev);
-    } else if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault();
-      setSelectedServiceIdx(idx);
+  // Scene 2: Drag-to-rotate handlers on .glaze-drag-zone (horizontal only, no conflict with vertical swipe)
+  const handleGlazePointerDown = useCallback((e) => {
+    if (activeSceneRef.current !== 2) return;
+    dragTrackRef.current = {
+      active: true,
+      pointerId: e.pointerId,
+      lastX: e.clientX,
+      startX: e.clientX,
+      startY: e.clientY,
+      lockedAxis: e.pointerType === 'mouse' ? 'x' : null,
+    };
+    if (e.pointerType === 'mouse') {
+      dragStateRef.current.isDragging = true;
+      setIsDraggingGlaze(true);
+      e.currentTarget.setPointerCapture?.(e.pointerId);
     }
-  };
+  }, []);
+
+  const handleGlazePointerMove = useCallback((e) => {
+    const track = dragTrackRef.current;
+    if (!track.active || track.pointerId !== e.pointerId) return;
+
+    if (!track.lockedAxis) {
+      const totalDx = Math.abs(e.clientX - track.startX);
+      const totalDy = Math.abs(e.clientY - track.startY);
+      if (totalDx < 6 && totalDy < 6) return;
+      if (totalDx > totalDy) {
+        track.lockedAxis = 'x';
+        dragStateRef.current.isDragging = true;
+        setIsDraggingGlaze(true);
+        e.currentTarget.setPointerCapture?.(e.pointerId);
+      } else {
+        track.lockedAxis = 'y';
+        return;
+      }
+    }
+
+    if (track.lockedAxis === 'x') {
+      const dx = e.clientX - track.lastX;
+      track.lastX = e.clientX;
+      dragStateRef.current.velocity = dx * 0.0085;
+    }
+  }, []);
+
+  const handleGlazePointerEnd = useCallback((e) => {
+    const track = dragTrackRef.current;
+    if (!track.active || track.pointerId !== e.pointerId) return;
+    track.active = false;
+    track.lockedAxis = null;
+    dragStateRef.current.isDragging = false;
+    setIsDraggingGlaze(false);
+    if (e.currentTarget.hasPointerCapture?.(e.pointerId)) {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    }
+  }, []);
+
+  const heroWhatsapp = buildWhatsappLink(
+    config.whatsappUrl,
+    'Здравствуйте, Катя! Хочу записаться в мастерскую «Апокриф».'
+  );
+  const formatWhatsapp = buildWhatsappLink(
+    config.whatsappUrl,
+    `Здравствуйте, Катя! Интересует формат «${activeFormat.title}» в мастерской «Апокриф».`
+  );
 
   return (
     <div className="app-shell">
-      <KilnStage activeScene={activeScene} pointerRef={pointerRef} />
-      <div className="vignette-layer" aria-hidden="true" />
+      <div className="ambient-glow" aria-hidden="true" />
 
+      <KilnStage
+        activeScene={activeScene}
+        glazeKey={glazeKey}
+        focusTarget={focusTarget}
+        dragStateRef={dragStateRef}
+        pointerRef={pointerRef}
+      />
+
+      {/* Editorial Top Header */}
       <header className="site-header">
         <button
           type="button"
           className="brand-mark"
-          onClick={() => goToScene(0, true)}
-          aria-label="Перейти на первый экран — Апокриф"
+          onClick={() => goToScene(0)}
+          aria-label="Перейти на первый экран"
         >
-          <span className="brand-emblem" aria-hidden="true">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-              <path
-                d="M9 4.5h6c-1.1 1.7-1.1 3.3 0 5.1 2.1 2.3 3 4.8 2.4 7.8-.5 2.5-2.4 4.1-5.4 4.1s-4.9-1.6-5.4-4.1c-.6-3 .3-5.5 2.4-7.8 1.1-1.8 1.1-3.4 0-5.1z"
-                fill="currentColor"
-              />
-            </svg>
-          </span>
-          <span className="brand-text">
-            <span className="brand-name">{cfg.brand?.name || 'Апокриф'}</span>
-            <span className="brand-sub">{cfg.brand?.city || 'Красноярск'}</span>
-          </span>
+          {config.brand}
         </button>
 
-        <nav className="header-nav" aria-label="Разделы сайта">
-          {navItems.map((item, idx) => (
+        <nav className="header-nav" aria-label="Навигация по разделам">
+          {NAV_SCENES.map((item) => (
             <button
               key={item.id}
               type="button"
-              className={`nav-link${activeScene === idx ? ' is-active' : ''}`}
-              aria-current={activeScene === idx ? 'step' : undefined}
-              onClick={() => goToScene(idx, true)}
-              onPointerMove={updateRadialGlow}
+              className={`header-nav-link ${activeScene === item.id ? 'is-active' : ''}`}
+              onClick={() => goToScene(item.id)}
+              aria-current={activeScene === item.id ? 'step' : undefined}
             >
-              <span className="nav-index">{item.shortLabel}</span>
-              <span>{item.label}</span>
+              {item.label}
             </button>
           ))}
         </nav>
 
         <a
-          href={heroWaHref}
+          className="header-cta"
+          href={heroWhatsapp}
           target="_blank"
           rel="noopener noreferrer"
-          className="header-cta"
-          onPointerMove={updateRadialGlow}
         >
-          Запись
+          Записаться
         </a>
       </header>
 
-      <aside className="chapter-rail" aria-label="Шкала сцен">
-        {navItems.map((item, idx) => (
-          <button
-            key={item.id}
-            type="button"
-            className={`chapter-dot${activeScene === idx ? ' is-active' : ''}`}
-            aria-label={`Сцена ${idx + 1}: ${item.label}`}
-            aria-current={activeScene === idx ? 'step' : undefined}
-            onClick={() => goToScene(idx, true)}
-          >
-            <span className="chapter-dot-pip" />
-            <span className="chapter-dot-label">{item.label}</span>
-          </button>
-        ))}
+      {/* Right Vertical Progress Rail (1-to-1 synced with header) */}
+      <aside className="scene-rail" aria-label="Индикатор секций">
+        <span className="rail-counter">{NAV_SCENES[activeScene].num}</span>
+        <div className="rail-dots">
+          {NAV_SCENES.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              className={`rail-dot ${activeScene === item.id ? 'is-active' : ''}`}
+              onClick={() => goToScene(item.id)}
+              aria-label={`Секция ${item.num}: ${item.label}`}
+              aria-current={activeScene === item.id ? 'step' : undefined}
+            />
+          ))}
+        </div>
+        <span className="rail-total">05</span>
       </aside>
 
-      <main className="scene-viewport">
+      {/* 5 Editorial Scenes */}
+      <main className="scenes-stage">
+        {/* SCENE 0 — HERO (CENTERED AROUND AMPHORA) */}
         <section
           ref={(el) => {
-            sceneRefs.current[0] = el;
+            sectionRefs.current[0] = el;
           }}
           className="scene scene-hero"
-          aria-hidden={activeScene !== 0}
+          aria-label="Вход"
         >
-          <div className="scene-inner hero-layout">
-            <div className="hero-content">
-              <div className="eyebrow">{cfg.hero?.eyebrow}</div>
-              <h1 className="hero-title">
-                <span>{cfg.hero?.titleLine1}</span>
-                <span className="accent-italic">{cfg.hero?.titleLine2}</span>
-              </h1>
-              <p className="hero-lead">{cfg.hero?.description}</p>
+          <div className="hero-top" data-anim="left">
+            <span className="eyebrow">Красноярск · мастерская керамики и фарфора</span>
+            <h1 className="hero-title">{config.brand}</h1>
+          </div>
 
-              <div className="hero-actions">
-                <a
-                  href={heroWaHref}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="btn btn-primary"
-                  onPointerMove={updateRadialGlow}
-                >
-                  {cfg.hero?.primaryCta}
-                </a>
-                <button
-                  type="button"
-                  className="btn btn-ghost"
-                  onClick={() => goToScene(3, true)}
-                  onPointerMove={updateRadialGlow}
-                >
-                  {cfg.hero?.secondaryCta}
-                </button>
-              </div>
-
-              <div className="hero-meta-strip">
-                <div className="rating-pill">
-                  <span className="rating-star" aria-hidden="true">★</span>
-                  <strong>{cfg.hero?.ratingScore}</strong>
-                  <span>{cfg.hero?.ratingMeta}</span>
-                </div>
-                <span className="scroll-cue">{cfg.hero?.scrollHint}</span>
-              </div>
+          <div className="hero-bottom" data-anim="right">
+            <p className="hero-subtitle">Тихая глина, живой фарфор</p>
+            <div className="hero-actions">
+              <a
+                className="btn-primary"
+                href={heroWhatsapp}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Написать в WhatsApp
+              </a>
             </div>
+            <button
+              type="button"
+              className="scroll-cue"
+              onClick={() => goToScene(1)}
+              aria-label="Перейти к мастерской"
+            >
+              <span>Листайте вниз</span>
+              <span className="scroll-line" aria-hidden="true" />
+            </button>
           </div>
         </section>
 
+        {/* SCENE 1 — WORKSHOP (3D LEFT, EDITORIAL TEXT RIGHT) */}
         <section
           ref={(el) => {
-            sceneRefs.current[1] = el;
+            sectionRefs.current[1] = el;
           }}
-          className="scene scene-studio"
-          aria-hidden={activeScene !== 1}
+          className="scene scene-workshop"
+          aria-label="Мастерская"
         >
-          <div className="scene-inner studio-layout">
-            <div className="studio-header">
-              <div className="eyebrow">{cfg.studio?.eyebrow}</div>
-              <h2 className="section-title">{cfg.studio?.title}</h2>
-              <p className="section-lead">{cfg.studio?.lead}</p>
-            </div>
+          <div className="workshop-column">
+            <span className="eyebrow" data-anim="right">
+              Мастер {config.master}
+            </span>
+            <h2 className="scene-heading" data-anim="right">
+              Место, где время течёт медленнее
+            </h2>
 
-            <div className="studio-cards">
-              {(cfg.studio?.highlights || []).map((card) => (
-                <article
-                  key={card.label}
-                  className="glass-card"
-                  onPointerMove={updateRadialGlow}
-                >
-                  <div className="card-kicker">{card.label}</div>
-                  <h3 className="card-heading">{card.value}</h3>
-                  <p className="card-body">{card.note}</p>
-                </article>
-              ))}
-            </div>
+            <ul className="editorial-list">
+              <li className="editorial-item" data-anim="right">
+                <span className="editorial-label">Камерный ритм</span>
+                <span className="editorial-desc">лепка без спешки и таймера</span>
+              </li>
+              <li className="editorial-item" data-anim="right">
+                <span className="editorial-label">Пёс Шлёпа</span>
+                <span className="editorial-desc">дружелюбный хозяин студии</span>
+              </li>
+              <li className="editorial-item" data-anim="right">
+                <span className="editorial-label">ул. Ломоносова, 50/1</span>
+                <span className="editorial-desc">по записи с 10:00, 2 этаж</span>
+              </li>
+            </ul>
           </div>
         </section>
 
+        {/* SCENE 2 — GLAZE SHOWCASE (CENTER + INTERACTIVE DRAG-TO-ROTATE) */}
         <section
           ref={(el) => {
-            sceneRefs.current[2] = el;
+            sectionRefs.current[2] = el;
           }}
-          className="scene scene-craft"
-          aria-hidden={activeScene !== 2}
+          className="scene scene-glazes"
+          aria-label="Глазури"
         >
-          <div className="scene-inner craft-layout">
-            <div className="craft-header">
-              <div className="eyebrow">{cfg.craft?.eyebrow}</div>
-              <h2 className="section-title">{cfg.craft?.title}</h2>
-              <p className="section-lead">{cfg.craft?.lead}</p>
-            </div>
+          <div className="glaze-header" data-anim="top">
+            <span className="eyebrow">Фактура и обжиг</span>
+            <h2 className="scene-heading">Живая глазурь</h2>
+          </div>
 
-            <div className="craft-stages">
-              {(cfg.craft?.stages || []).map((stage) => (
-                <article
-                  key={stage.index}
-                  className="stage-row"
-                  onPointerMove={updateRadialGlow}
-                >
-                  <div className="stage-roman">{stage.index}</div>
-                  <div className="stage-copy">
-                    <h3>{stage.title}</h3>
-                    <p>{stage.text}</p>
-                  </div>
-                </article>
-              ))}
-            </div>
+          <div
+            className={`glaze-drag-zone ${isDraggingGlaze ? 'is-dragging' : ''}`}
+            data-anim="center"
+            onPointerDown={handleGlazePointerDown}
+            onPointerMove={handleGlazePointerMove}
+            onPointerUp={handleGlazePointerEnd}
+            onPointerCancel={handleGlazePointerEnd}
+            role="application"
+            aria-label="Интерактивная область вращения 3D-амфоры"
+          >
+            <span className="drag-hint">Потяните, чтобы повернуть</span>
+          </div>
+
+          <div className="glaze-switcher" data-anim="bottom" role="radiogroup" aria-label="Выбор глазури">
+            {GLAZE_UI.map((g) => (
+              <button
+                key={g.id}
+                type="button"
+                role="radio"
+                aria-checked={glazeKey === g.id}
+                className={`glaze-option ${glazeKey === g.id ? 'is-active' : ''}`}
+                onClick={() => setGlazeKey(g.id)}
+              >
+                <span
+                  className="glaze-swatch"
+                  style={{ backgroundColor: g.swatch }}
+                  aria-hidden="true"
+                />
+                <span className="glaze-name">{g.label}</span>
+              </button>
+            ))}
           </div>
         </section>
 
+        {/* SCENE 3 — FORMATS (DIAGONAL / CENTER, ZERO BOXES, FIXED DETAIL BAR) */}
         <section
           ref={(el) => {
-            sceneRefs.current[3] = el;
+            sectionRefs.current[3] = el;
           }}
           className="scene scene-formats"
-          aria-hidden={activeScene !== 3}
+          aria-label="Форматы"
         >
-          <div className="scene-inner formats-layout">
-            <div className="formats-header" data-counter="a">
-              <div className="eyebrow">{cfg.formats?.eyebrow}</div>
-              <h2 className="section-title">{cfg.formats?.title}</h2>
+          <div className="formats-layout">
+            <div className="formats-head" data-anim="top">
+              <span className="eyebrow">Мастер-классы и изделия</span>
+              <h2 className="scene-heading">Шесть форматов</h2>
             </div>
 
-            <div className="formats-list" role="listbox" aria-label="Форматы и изделия" data-counter="a">
-              {formatItems.map((item, idx) => {
-                const isSelected = idx === selectedServiceIdx;
+            <div className="formats-list" role="listbox" aria-label="Форматы мастерской">
+              {config.formats.map((fmt, idx) => {
+                const isSelected = idx === selectedFormatIdx;
                 return (
                   <button
-                    key={item.id}
+                    key={fmt.num}
                     type="button"
                     role="option"
                     aria-selected={isSelected}
-                    className={`service-row${isSelected ? ' is-selected' : ''}`}
-                    onClick={() => setSelectedServiceIdx(idx)}
-                    onPointerEnter={(e) => {
-                      if (e.pointerType === 'mouse') {
-                        setSelectedServiceIdx(idx);
-                      }
-                    }}
-                    onPointerMove={updateRadialGlow}
-                    onKeyDown={(e) => handleServiceKeyDown(e, idx)}
+                    className={`format-row ${isSelected ? 'is-active' : ''}`}
+                    data-anim="row"
+                    onMouseEnter={() => setSelectedFormatIdx(idx)}
+                    onFocus={() => setSelectedFormatIdx(idx)}
+                    onClick={() => setSelectedFormatIdx(idx)}
                   >
-                    <span className="service-id">{item.id}</span>
-                    <span className="service-name">{item.title}</span>
-                    <span className="service-price">{item.priceLabel}</span>
+                    <span className="format-num">{fmt.num}</span>
+                    <span className="format-title">{fmt.title}</span>
+                    <span className="format-status">{fmt.status}</span>
                   </button>
                 );
               })}
             </div>
 
-            <div className="service-detail-bar" data-counter="b" aria-live="polite">
-              <div className="service-detail-copy">
-                <div className="service-detail-head">
-                  <span className="service-detail-id">{selectedService.id}</span>
-                  <strong className="service-detail-title">{selectedService.title}</strong>
-                </div>
-                <p className="service-detail-desc">{selectedService.description}</p>
+            <div className="formats-detail-bar" data-anim="bottom">
+              <div className="formats-detail-copy">
+                <span className="formats-detail-num">{activeFormat.num}</span>
+                <p className="formats-detail-note">{activeFormat.note}</p>
               </div>
               <a
-                href={selectedServiceWaHref}
+                className="btn-inline"
+                href={formatWhatsapp}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="btn btn-primary service-detail-cta"
-                onPointerMove={updateRadialGlow}
               >
-                {cfg.formats?.ctaPrefix || 'Обсудить в WhatsApp'}: {selectedService.title}
+                Уточнить в WhatsApp →
               </a>
             </div>
           </div>
         </section>
 
+        {/* SCENE 4 — CONTACTS (CLEAN CENTER FINALE) */}
         <section
           ref={(el) => {
-            sceneRefs.current[4] = el;
+            sectionRefs.current[4] = el;
           }}
           className="scene scene-contacts"
-          aria-hidden={activeScene !== 4}
+          aria-label="Контакты"
         >
-          <div className="scene-inner contacts-layout">
-            <div className="contacts-info">
-              <div className="eyebrow">{cfg.contacts?.eyebrow}</div>
-              <h2 className="section-title">{cfg.contacts?.title}</h2>
+          <div className="contacts-inner">
+            <span className="eyebrow" data-anim="center">
+              {config.rating} · {config.reviewsNote}
+            </span>
+            <h2 className="scene-heading contacts-heading" data-anim="center">
+              Ждём в мастерской
+            </h2>
+            <p className="contacts-address" data-anim="center">
+              {config.addressFull} · с 10:00 по записи
+            </p>
+            <p className="contacts-landmark" data-anim="center">
+              {config.landmark}
+            </p>
+            <p className="contacts-gift" data-anim="center">
+              {config.giftNote}
+            </p>
 
-              <div className="contacts-meta-list">
-                <div className="contact-fact">
-                  <span className="fact-label">Адрес</span>
-                  <span className="fact-value">{cfg.contacts?.address}</span>
-                  <span className="fact-sub">{cfg.contacts?.landmark}</span>
-                </div>
-                <div className="contact-fact-row">
-                  <div className="contact-fact">
-                    <span className="fact-label">Режим работы</span>
-                    <span className="fact-value">{cfg.contacts?.hours}</span>
-                  </div>
-                  <div className="contact-fact">
-                    <span className="fact-label">Отзывы</span>
-                    <span className="fact-value">{cfg.contacts?.rating}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="contact-links">
-                <a
-                  href={heroWaHref}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="btn btn-primary"
-                  onPointerMove={updateRadialGlow}
-                >
-                  WhatsApp · {cfg.contacts?.phoneDisplay}
-                </a>
-                <a
-                  href={cfg.contacts?.telegramDirect}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="btn btn-ghost"
-                  onPointerMove={updateRadialGlow}
-                >
-                  Telegram
-                </a>
-                <a
-                  href={cfg.contacts?.telegramChannel}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="btn btn-subtle"
-                  onPointerMove={updateRadialGlow}
-                >
-                  {cfg.contacts?.telegramChannelLabel}
-                </a>
-                <a
-                  href={cfg.contacts?.vkUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="btn btn-subtle"
-                  onPointerMove={updateRadialGlow}
-                >
-                  {cfg.contacts?.vkLabel}
-                </a>
-              </div>
-            </div>
-
-            <div className="contacts-cert-col">
-              {cfg.contacts?.certificate && (
-                <GiftCertificateCard
-                  cert={cfg.contacts.certificate}
-                  whatsappBase={waBase}
-                />
-              )}
+            <div className="contacts-links" data-anim="center">
+              <a
+                className="btn-primary"
+                href={heroWhatsapp}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                WhatsApp
+              </a>
+              <a
+                className="btn-ghost"
+                href={config.telegramUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Telegram
+              </a>
+              <a
+                className="btn-ghost"
+                href={config.telegramChannelUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Канал {config.telegramChannelLabel}
+              </a>
+              <a
+                className="btn-ghost"
+                href={config.vkUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                ВКонтакте
+              </a>
             </div>
           </div>
         </section>
