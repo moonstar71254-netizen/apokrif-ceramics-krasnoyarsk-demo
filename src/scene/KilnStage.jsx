@@ -58,7 +58,7 @@ function CrispPostProcessing({ firingTemp }) {
 
   useEffect(() => {
     const heat = (Math.max(900, Math.min(1250, firingTemp)) - 900) / 350;
-    bloomPass.strength = 0.13 + heat * 0.05; // stays strictly <= 0.18 (<= 0.20)
+    bloomPass.strength = 0.12 + heat * 0.05; // stays strictly <= 0.17 (<= 0.20)
     bloomPass.threshold = 0.92;
   }, [bloomPass, firingTemp]);
 
@@ -92,39 +92,40 @@ export default function KilnStage({
     <div className="stage-layer">
       <Canvas
         dpr={[1, 2]}
-        camera={{ fov: 36, near: 0.1, far: 80, position: [0, 0.24, 6.95] }}
+        camera={{ fov: 36, near: 0.1, far: 80, position: [0, 0.22, 9.15] }}
         gl={{
           antialias: true,
           alpha: false,
           powerPreference: 'high-performance',
           toneMapping: THREE.ACESFilmicToneMapping,
-          toneMappingExposure: 1.04,
+          toneMappingExposure: 1.03,
         }}
       >
+        {/* Soft circular & ring Lightformers prevent harsh square specular glare on satin porcelain */}
         <Environment resolution={512} frames={1}>
           <Lightformer
-            form="rect"
-            intensity={2.45}
+            form="circle"
+            intensity={1.75}
             color="#FFF2E0"
-            position={[4.5, 4.5, 3.5]}
-            scale={[5.5, 8.5, 1]}
+            position={[5.5, 4.8, 4.2]}
+            scale={7.5}
             target={[0, 0, 0]}
           />
           <Lightformer
-            form="rect"
-            intensity={1.65}
+            form="circle"
+            intensity={1.35}
             color="#E89A5C"
-            position={[-5.2, 2.2, -2.5]}
-            scale={[4.5, 6.5, 1]}
+            position={[-6.0, 2.4, -2.8]}
+            scale={6.5}
             target={[0, 0, 0]}
           />
           <Lightformer
             form="ring"
-            intensity={0.95}
+            intensity={0.85}
             color="#D6DFE8"
-            position={[0, 6.5, 0]}
+            position={[0, 7.0, 0]}
             rotation={[Math.PI / 2, 0, 0]}
-            scale={6.5}
+            scale={7.5}
           />
         </Environment>
 
