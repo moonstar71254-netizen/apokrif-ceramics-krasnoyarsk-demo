@@ -16,8 +16,6 @@ const IMPORT_MAP = {
       'https://esm.sh/three@0.169.0/examples/jsm/postprocessing/UnrealBloomPass.js?external=three',
     'three/examples/jsm/postprocessing/OutputPass.js':
       'https://esm.sh/three@0.169.0/examples/jsm/postprocessing/OutputPass.js?external=three',
-    'three/examples/jsm/postprocessing/SMAAPass.js':
-      'https://esm.sh/three@0.169.0/examples/jsm/postprocessing/SMAAPass.js?external=three',
     '@react-three/fiber': 'https://esm.sh/@react-three/fiber@8.17.10?external=react,react-dom,three',
     '@react-three/drei':
       'https://esm.sh/@react-three/drei@9.114.3?external=react,react-dom,three,@react-three/fiber',
@@ -65,7 +63,6 @@ export default defineConfig({
         'three/examples/jsm/postprocessing/RenderPass.js',
         'three/examples/jsm/postprocessing/UnrealBloomPass.js',
         'three/examples/jsm/postprocessing/OutputPass.js',
-        'three/examples/jsm/postprocessing/SMAAPass.js',
         '@react-three/fiber',
         '@react-three/drei',
         'gsap',

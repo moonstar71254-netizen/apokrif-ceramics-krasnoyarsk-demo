@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import * as THREE from 'three';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Environment, Lightformer } from '@react-three/drei';
@@ -6,114 +6,58 @@ import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
-import { SMAAPass } from 'three/examples/jsm/postprocessing/SMAAPass.js';
 import CeramicComposition from './CeramicComposition';
 
-function detectSoftwareRenderer(gl) {
-  try {
-    const ctx = gl.getContext();
-    const ext = ctx.getExtension('WEBGL_debug_renderer_info');
-    if (!ext) return false;
-    const renderer = ctx.getParameter(ext.UNMASKED_RENDERER_WEBGL) || '';
-    return /SwiftShader|llvmpipe|Software|Mesa OffScreen/i.test(renderer);
-  } catch {
-    return false;
-  }
-}
-
-function CursorKilnLight({ pointerRef }) {
-  const lightRef = useRef(null);
-
-  useFrame((_, delta) => {
-    if (!lightRef.current) return;
-    const dt = Math.min(delta, 0.05);
-    const px = pointerRef.current ? pointerRef.current.x : 0;
-    const py = pointerRef.current ? pointerRef.current.y : 0;
-    const tx = 1.1 + px * 3.4;
-    const ty = 0.6 + py * 2.2;
-    lightRef.current.position.x = THREE.MathUtils.lerp(lightRef.current.position.x, tx, dt * 6);
-    lightRef.current.position.y = THREE.MathUtils.lerp(lightRef.current.position.y, ty, dt * 6);
-  });
-
-  return (
-    <pointLight
-      ref={lightRef}
-      position={[1.1, 0.6, 3.2]}
-      intensity={16}
-      distance={11}
-      decay={2}
-      color="#E6B07B"
-    />
-  );
-}
-
-function PostProcessingRig() {
+function CrispPostProcessing() {
   const { gl, scene, camera, size } = useThree();
 
-  const { composer, bloomPass, smaaPass } = useMemo(() => {
-    const software = detectSoftwareRenderer(gl);
+  const { composer, bloomPass } = useMemo(() => {
+    const context = gl.getContext();
+    const rendererInfo = String(context?.getParameter?.(context.RENDERER) || '');
+    const isSoftware = /swiftshader|llvmpipe|software/i.test(rendererInfo);
     const samples =
-      !software && gl.capabilities.isWebGL2
+      !isSoftware && gl.capabilities.isWebGL2
         ? Math.min(8, gl.capabilities.maxSamples || 4)
         : 0;
 
-    const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
-    const width = Math.max(1, size.width);
-    const height = Math.max(1, size.height);
+    const dpr = gl.getPixelRatio();
+    const w = Math.max(1, Math.floor(size.width * dpr));
+    const h = Math.max(1, Math.floor(size.height * dpr));
 
-    const renderTarget = new THREE.WebGLRenderTarget(
-      Math.floor(width * pixelRatio),
-      Math.floor(height * pixelRatio),
-      {
-        type: THREE.HalfFloatType,
-        samples,
-      }
-    );
+    const target = new THREE.WebGLRenderTarget(w, h, {
+      type: THREE.HalfFloatType,
+      samples,
+    });
 
-    const effectComposer = new EffectComposer(gl, renderTarget);
-    effectComposer.setPixelRatio(pixelRatio);
-    effectComposer.setSize(width, height);
+    const effectComposer = new EffectComposer(gl, target);
+    effectComposer.setPixelRatio(dpr);
+    effectComposer.setSize(size.width, size.height);
 
     const renderPass = new RenderPass(scene, camera);
-    effectComposer.addPass(renderPass);
-
-    const bloom = new UnrealBloomPass(
-      new THREE.Vector2(width, height),
-      0.22,
-      0.45,
-      0.92
-    );
-    effectComposer.addPass(bloom);
-
+    const bloom = new UnrealBloomPass(new THREE.Vector2(w, h), 0.14, 0.38, 0.94);
     const outputPass = new OutputPass();
+
+    effectComposer.addPass(renderPass);
+    effectComposer.addPass(bloom);
     effectComposer.addPass(outputPass);
 
-    let smaa = null;
-    if (!software) {
-      smaa = new SMAAPass(
-        Math.floor(width * pixelRatio),
-        Math.floor(height * pixelRatio)
-      );
-      effectComposer.addPass(smaa);
-    }
-
-    return { composer: effectComposer, bloomPass: bloom, smaaPass: smaa };
+    return { composer: effectComposer, bloomPass: bloom };
   }, [gl, scene, camera]);
 
   useEffect(() => {
-    const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
-    const width = Math.max(1, size.width);
-    const height = Math.max(1, size.height);
-    composer.setPixelRatio(pixelRatio);
-    composer.setSize(width, height);
-    bloomPass.resolution.set(width, height);
-    if (smaaPass) {
-      smaaPass.setSize(Math.floor(width * pixelRatio), Math.floor(height * pixelRatio));
-    }
-  }, [composer, bloomPass, smaaPass, size.width, size.height]);
+    const dpr = gl.getPixelRatio();
+    composer.setPixelRatio(dpr);
+    composer.setSize(size.width, size.height);
+    bloomPass.setSize(
+      Math.max(1, Math.floor(size.width * dpr)),
+      Math.max(1, Math.floor(size.height * dpr))
+    );
+  }, [composer, bloomPass, gl, size.width, size.height]);
 
   useEffect(() => {
     return () => {
+      composer.renderTarget1?.dispose();
+      composer.renderTarget2?.dispose();
       composer.dispose();
     };
   }, [composer]);
@@ -125,73 +69,62 @@ function PostProcessingRig() {
   return null;
 }
 
-export default function KilnStage({ activeScene, pointerRef }) {
+export default function KilnStage({
+  activeScene,
+  glazeKey,
+  focusTarget,
+  dragStateRef,
+  pointerRef,
+}) {
   return (
-    <div className="canvas-stage" aria-hidden="true">
+    <div className="stage-layer" aria-hidden="true">
       <Canvas
         dpr={[1, 2]}
-        camera={{ position: [0.35, 0.35, 6.4], fov: 38, near: 0.1, far: 40 }}
+        camera={{ fov: 36, near: 0.1, far: 60, position: [0, 0.24, 6.15] }}
         gl={{
           antialias: true,
           alpha: false,
           powerPreference: 'high-performance',
           toneMapping: THREE.ACESFilmicToneMapping,
-          toneMappingExposure: 1.04,
+          toneMappingExposure: 1.05,
         }}
       >
-        <color attach="background" args={['#0B0A09']} />
-        <fog attach="fog" args={['#0B0A09', 9.5, 22]} />
-
-        <ambientLight intensity={0.28} color="#EADAD0" />
-        <directionalLight position={[4.5, 5.2, 4.2]} intensity={1.8} color="#F5DFC6" />
-        <directionalLight position={[-4.5, -1.8, -3.0]} intensity={1.05} color="#C98A55" />
-        <spotLight
-          position={[-2.5, 4.8, 3.0]}
-          angle={0.48}
-          penumbra={0.85}
-          intensity={14}
-          color="#E0A976"
-        />
-
-        <CursorKilnLight pointerRef={pointerRef} />
-
-        <Environment resolution={512} frames={1}>
+        <Environment resolution={256} frames={1}>
+          <Lightformer
+            form="rect"
+            intensity={2.4}
+            color="#FFF2E0"
+            position={[4, 4, 3]}
+            scale={[5, 8, 1]}
+            target={[0, 0, 0]}
+          />
+          <Lightformer
+            form="rect"
+            intensity={1.5}
+            color="#E89A5C"
+            position={[-5, 2, -2]}
+            scale={[4, 6, 1]}
+            target={[0, 0, 0]}
+          />
           <Lightformer
             form="ring"
-            intensity={1.9}
-            color="#E0A976"
-            scale={[7, 7, 1]}
-            position={[4, 2.5, 3]}
-            target={[0, 0, 0]}
-          />
-          <Lightformer
-            form="rect"
-            intensity={2.2}
-            color="#F3ECE4"
-            scale={[5, 8, 1]}
-            position={[-4.5, 3, 2]}
-            target={[0, 0, 0]}
-          />
-          <Lightformer
-            form="rect"
-            intensity={1.7}
-            color="#C98A55"
-            scale={[8, 4, 1]}
-            position={[1, -3.8, 1]}
-            target={[0, 0, 0]}
-          />
-          <Lightformer
-            form="circle"
-            intensity={1.5}
-            color="#7A482B"
-            scale={[6, 6, 1]}
-            position={[0, 1.5, -5]}
-            target={[0, 0, 0]}
+            intensity={0.9}
+            color="#D6DFE8"
+            position={[0, 6, 0]}
+            rotation={[Math.PI / 2, 0, 0]}
+            scale={6}
           />
         </Environment>
 
-        <CeramicComposition activeScene={activeScene} pointerRef={pointerRef} />
-        <PostProcessingRig />
+        <CeramicComposition
+          activeScene={activeScene}
+          glazeKey={glazeKey}
+          focusTarget={focusTarget}
+          dragStateRef={dragStateRef}
+          pointerRef={pointerRef}
+        />
+
+        <CrispPostProcessing />
       </Canvas>
     </div>
   );
