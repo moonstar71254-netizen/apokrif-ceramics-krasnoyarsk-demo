@@ -8,6 +8,7 @@ export default function GiftCertificateCard({ cert, whatsappBase }) {
   const wrapRef = useRef(null);
   const cardRef = useRef(null);
   const rafRef = useRef(0);
+  const lastTimeRef = useRef(0);
   const stateRef = useRef({
     active: false,
     targetRx: 0,
@@ -33,13 +34,20 @@ export default function GiftCertificateCard({ cert, whatsappBase }) {
     const card = cardRef.current;
     if (!card) {
       rafRef.current = 0;
+      lastTimeRef.current = 0;
       return;
     }
 
-    s.curRx += (s.targetRx - s.curRx) * LERP;
-    s.curRy += (s.targetRy - s.curRy) * LERP;
-    s.curGx += (s.targetGx - s.curGx) * LERP;
-    s.curGy += (s.targetGy - s.curGy) * LERP;
+    const now = performance.now();
+    const prev = lastTimeRef.current || now;
+    const dt = Math.max(0, (now - prev) / 1000);
+    lastTimeRef.current = now;
+    const factor = 1 - Math.pow(1 - LERP, Math.min(dt, 0.05) * 60);
+
+    s.curRx += (s.targetRx - s.curRx) * factor;
+    s.curRy += (s.targetRy - s.curRy) * factor;
+    s.curGx += (s.targetGx - s.curGx) * factor;
+    s.curGy += (s.targetGy - s.curGy) * factor;
 
     card.style.setProperty('--rx', `${s.curRx.toFixed(3)}deg`);
     card.style.setProperty('--ry', `${s.curRy.toFixed(3)}deg`);
@@ -64,6 +72,7 @@ export default function GiftCertificateCard({ cert, whatsappBase }) {
       card.style.setProperty('--gy', '50%');
       card.style.transform = 'none';
       rafRef.current = 0;
+      lastTimeRef.current = 0;
       return;
     }
 
@@ -73,6 +82,7 @@ export default function GiftCertificateCard({ cert, whatsappBase }) {
 
   const ensureLoop = () => {
     if (!rafRef.current) {
+      lastTimeRef.current = performance.now();
       rafRef.current = requestAnimationFrame(tick);
     }
   };
