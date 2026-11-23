@@ -126,7 +126,7 @@ export const GLAZE_PRESETS = {
 
 const BUTTON_SPECS = [
   { key: 'btn0', radius: 0.195, holes: 4, color: '#D69F78', depthTone: 1.0 },
-  { key: 'btn1', radius: 0.185, holes: 2, color: '#E8DED1', depthTone: 1.0 },
+  { key: 'btn1', radius: 0.185, holes: 2, color: '#D8CCBD', depthTone: 1.0 },
   { key: 'btn2', radius: 0.195, holes: 4, color: '#C87846', depthTone: 1.0 },
   { key: 'btn3', radius: 0.18,  holes: 2, color: '#B4886E', depthTone: 1.0 },
   { key: 'btn4', radius: 0.165, holes: 4, color: '#DFD2C2', depthTone: 0.92 },
@@ -832,12 +832,12 @@ export default function CeramicComposition({
       const bm = buttonMatRefs.current[b.key];
       if (!bm) return;
       const h = hoverSprings.current[b.key] || 0;
-      bm.roughness = THREE.MathUtils.clamp(0.42 - heat * 0.18, 0.14, 0.75);
-      bm.clearcoat = THREE.MathUtils.clamp(0.48 + heat * 0.3, 0.2, 0.92);
-      bm.clearcoatRoughness = THREE.MathUtils.clamp(0.28 - heat * 0.14, 0.08, 0.55);
+      bm.roughness = THREE.MathUtils.clamp(0.48 - heat * 0.12, 0.28, 0.78);
+      bm.clearcoat = THREE.MathUtils.clamp(0.36 + heat * 0.16, 0.18, 0.54);
+      bm.clearcoatRoughness = THREE.MathUtils.clamp(0.34 - heat * 0.1, 0.18, 0.55);
       tmpEmissive.copy(emberColor).lerp(hoverColor, h);
       bm.emissive.copy(tmpEmissive);
-      bm.emissiveIntensity = heat * 0.18 + h * 0.34;
+      bm.emissiveIntensity = heat * 0.1 + h * 0.24;
     });
 
     if (rimLightRef.current) {

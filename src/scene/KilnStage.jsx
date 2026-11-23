@@ -36,7 +36,7 @@ function CrispPostProcessing({ firingTemp }) {
 
     const renderPass = new RenderPass(scene, camera);
     // Delicate bloom: threshold >= 0.90, strength <= 0.20 (no whiteout)
-    const bloom = new UnrealBloomPass(new THREE.Vector2(w, h), 0.14, 0.36, 0.92);
+    const bloom = new UnrealBloomPass(new THREE.Vector2(w, h), 0.10, 0.32, 0.97);
     const outputPass = new OutputPass();
 
     effectComposer.addPass(renderPass);
@@ -58,8 +58,8 @@ function CrispPostProcessing({ firingTemp }) {
 
   useEffect(() => {
     const heat = (Math.max(900, Math.min(1250, firingTemp)) - 900) / 350;
-    bloomPass.strength = 0.12 + heat * 0.05; // stays strictly <= 0.17 (<= 0.20)
-    bloomPass.threshold = 0.92;
+    bloomPass.strength = 0.10 + heat * 0.02; // stays strictly <= 0.12 (no square halo)
+    bloomPass.threshold = 0.97;
   }, [bloomPass, firingTemp]);
 
   useEffect(() => {
