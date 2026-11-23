@@ -51,9 +51,8 @@ export function createGlazeTextureSet(presetKey, maxAnisotropy = 4) {
 
   if (presetKey === 'porcelain') {
     const rand = mulberry32(202602);
-    // Warm satin milk-porcelain vertical glaze gradient
     const grad = cCtx.createLinearGradient(0, 0, 0, TEX_SIZE);
-    grad.addColorStop(0.0, '#F5EFE6');
+    grad.addColorStop(0.0, '#F6F0E8');
     grad.addColorStop(0.28, '#EFE6D9');
     grad.addColorStop(0.65, '#E7DCCB');
     grad.addColorStop(1.0, '#D9CBB8');
@@ -66,7 +65,6 @@ export function createGlazeTextureSet(presetKey, maxAnisotropy = 4) {
     rCtx.fillStyle = '#5C5C5C';
     rCtx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
 
-    // Subtle wheel-turned satin bands
     for (let y = 0; y < TEX_SIZE; y += 2) {
       const wave = Math.sin(y * 0.085) * 0.5 + Math.sin(y * 0.23) * 0.5;
       const alpha = 0.018 + Math.abs(wave) * 0.02;
@@ -82,7 +80,6 @@ export function createGlazeTextureSet(presetKey, maxAnisotropy = 4) {
       rCtx.fillRect(0, y, TEX_SIZE, 2);
     }
 
-    // Ultra-fine porcelain mineral flecks
     for (let i = 0; i < 6500; i++) {
       const x = rand() * TEX_SIZE;
       const y = rand() * TEX_SIZE;
@@ -97,7 +94,6 @@ export function createGlazeTextureSet(presetKey, maxAnisotropy = 4) {
     }
   } else if (presetKey === 'copper') {
     const rand = mulberry32(202603);
-    // Kiln-fired copper-amber reduction glaze
     const grad = cCtx.createLinearGradient(0, 0, 0, TEX_SIZE);
     grad.addColorStop(0.0, '#A85C32');
     grad.addColorStop(0.22, '#C87542');
@@ -113,7 +109,6 @@ export function createGlazeTextureSet(presetKey, maxAnisotropy = 4) {
     rCtx.fillStyle = '#525252';
     rCtx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
 
-    // Reduction glaze flow bands & subtle kiln shimmer
     for (let y = 0; y < TEX_SIZE; y += 2) {
       const n1 = Math.sin(y * 0.055) + Math.sin(y * 0.19) * 0.5;
       const warm = n1 > 0;
@@ -131,7 +126,6 @@ export function createGlazeTextureSet(presetKey, maxAnisotropy = 4) {
       rCtx.fillRect(0, y, TEX_SIZE, 2);
     }
 
-    // Subtle vertical glaze drips from rim
     for (let i = 0; i < 42; i++) {
       const x = rand() * TEX_SIZE;
       const w = 4 + rand() * 14;
@@ -150,7 +144,6 @@ export function createGlazeTextureSet(presetKey, maxAnisotropy = 4) {
       rCtx.fillRect(x, 0, w, h);
     }
 
-    // Fine metallic mineral crystallization flecks
     for (let i = 0; i < 11000; i++) {
       const x = rand() * TEX_SIZE;
       const y = rand() * TEX_SIZE;
@@ -164,7 +157,6 @@ export function createGlazeTextureSet(presetKey, maxAnisotropy = 4) {
       bCtx.fillRect(x, y, size, size);
     }
   } else {
-    // Default: 'chamotte' — dark stoneware clay with lively mineral grain & potter's grooves
     const rand = mulberry32(202601);
     const grad = cCtx.createLinearGradient(0, 0, 0, TEX_SIZE);
     grad.addColorStop(0.0, '#6E4C3B');
@@ -180,7 +172,6 @@ export function createGlazeTextureSet(presetKey, maxAnisotropy = 4) {
     rCtx.fillStyle = '#C4C4C4';
     rCtx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
 
-    // Distinct potter's wheel grooves (fine horizontal ribbing)
     for (let y = 0; y < TEX_SIZE; y += 2) {
       const groove =
         Math.sin(y * 0.14) * 0.55 +
@@ -201,7 +192,6 @@ export function createGlazeTextureSet(presetKey, maxAnisotropy = 4) {
       rCtx.fillRect(0, y, TEX_SIZE, 2);
     }
 
-    // Lively chamotte grog speckles (terracotta, quartz, dark iron)
     for (let i = 0; i < 22000; i++) {
       const x = rand() * TEX_SIZE;
       const y = rand() * TEX_SIZE;
@@ -230,6 +220,66 @@ export function createGlazeTextureSet(presetKey, maxAnisotropy = 4) {
     map: configureTexture(colorCanvas, { isColor: true, maxAnisotropy, repeatX: 2, repeatY: 1 }),
     bumpMap: configureTexture(bumpCanvas, { isColor: false, maxAnisotropy, repeatX: 2, repeatY: 1 }),
     roughnessMap: configureTexture(roughCanvas, { isColor: false, maxAnisotropy, repeatX: 2, repeatY: 1 }),
+  };
+}
+
+/**
+ * Generates crisp 1024x1024 brushed-metal concentric lathe PBR maps
+ * for the polished potter's wheel head (concentric lathe grooves + subtle clay patina).
+ */
+export function createWheelTextureSet(maxAnisotropy = 4) {
+  const colorCanvas = makeCanvas();
+  const bumpCanvas = makeCanvas();
+  const roughCanvas = makeCanvas();
+
+  const cCtx = colorCanvas.getContext('2d');
+  const bCtx = bumpCanvas.getContext('2d');
+  const rCtx = roughCanvas.getContext('2d');
+
+  const rand = mulberry32(202609);
+
+  cCtx.fillStyle = '#4B443E';
+  cCtx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
+  bCtx.fillStyle = '#808080';
+  bCtx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
+  rCtx.fillStyle = '#686868';
+  rCtx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
+
+  // Horizontal lathe lines map concentrically around LatheGeometry
+  for (let y = 0; y < TEX_SIZE; y++) {
+    const fine = Math.sin(y * 0.45) * 0.5 + Math.sin(y * 1.15) * 0.3 + Math.sin(y * 0.08) * 0.2;
+    const isScore = y % 72 === 0 || y % 72 === 1;
+    const cDelta = isScore ? -24 : Math.round(fine * 16);
+    const r = Math.min(255, Math.max(0, 76 + cDelta));
+    const g = Math.min(255, Math.max(0, 70 + cDelta));
+    const b = Math.min(255, Math.max(0, 64 + cDelta));
+    cCtx.fillStyle = `rgb(${r},${g},${b})`;
+    cCtx.fillRect(0, y, TEX_SIZE, 1);
+
+    const bVal = isScore ? 68 : Math.round(128 + fine * 28);
+    bCtx.fillStyle = `rgb(${bVal},${bVal},${bVal})`;
+    bCtx.fillRect(0, y, TEX_SIZE, 1);
+
+    const rVal = isScore ? 165 : Math.round(96 - fine * 20);
+    rCtx.fillStyle = `rgb(${rVal},${rVal},${rVal})`;
+    rCtx.fillRect(0, y, TEX_SIZE, 1);
+  }
+
+  // Subtle dried clay dust patina flecks
+  for (let i = 0; i < 4500; i++) {
+    const x = rand() * TEX_SIZE;
+    const y = rand() * TEX_SIZE;
+    const size = 0.8 + rand() * 1.8;
+    cCtx.fillStyle = 'rgba(182,154,126,0.08)';
+    cCtx.fillRect(x, y, size, size);
+    rCtx.fillStyle = 'rgba(195,195,195,0.16)';
+    rCtx.fillRect(x, y, size, size);
+  }
+
+  return {
+    map: configureTexture(colorCanvas, { isColor: true, maxAnisotropy, repeatX: 1, repeatY: 1 }),
+    bumpMap: configureTexture(bumpCanvas, { isColor: false, maxAnisotropy, repeatX: 1, repeatY: 1 }),
+    roughnessMap: configureTexture(roughCanvas, { isColor: false, maxAnisotropy, repeatX: 1, repeatY: 1 }),
   };
 }
 
